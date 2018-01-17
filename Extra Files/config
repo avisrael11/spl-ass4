@@ -1,0 +1,10 @@
+wood,50
+hammer,150
+gold,200
+metal,250
+worker,1,Alice
+worker,2,Bob
+assembling wagons,1,wood,10,2
+researching nukes,2,metal,100,5
+building a wonder,2,gold,100,10
+conquering Asia,1,hammer,150,7
