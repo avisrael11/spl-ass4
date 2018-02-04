@@ -18,20 +18,35 @@ atexit.register(_close_db)
 
 
 # our application API:
-def print_all_db():
-    cur = _conn.cursor()
+# def print_all_db():
+#     cur = _conn.cursor()
+#
+#     cur.execute("""
+#         SELECT *
+#         FROM tasks
+#     """)
+#     print (cur.fetchall())
+#
+# def getWorker():
+#     cur = _conn.cursor()
+#     cur.execute("""
+#                 SELECT id, name, status
+#                 FROM workers
+#             """)
+#     return cur.fetchall()
 
-    cur.execute("""
-        SELECT *
-        FROM tasks
-    """)
-    print (cur.fetchall())
+def getWorker(workerId):
+    cur = _conn.cursor()
+    cur.execute("SELECT id, name, status FROM workers WHERE id=(?)", (workerId,))
+    return cur.fetchone()
 
-def getWorker():
+def getNextTask(): #return the first task of every worker
     cur = _conn.cursor()
     cur.execute("""
-                SELECT id, name, status 
-                FROM workers
+                SELECT Min(tasks.id),tasks.task_name, workers.id, workers.name, workers.status
+                FROM tasks JOIN workers ON tasks.worker_id = workers.id
+                GROUP BY tasks.worker_id
+                ORDER BY tasks.id
             """)
     return cur.fetchall()
 
@@ -39,7 +54,7 @@ def getWorker():
 def isExistTasks():
     cur = _conn.cursor()
     cur.execute("""SELECT count(*) 
-                              FROM tasks
+                   FROM tasks
                 """)
     sumTask = int(cur.fetchall()[0][0])
     if sumTask > 0:
@@ -47,11 +62,11 @@ def isExistTasks():
     return False
 
 
-def getTasks(idWorker):
-    cur = _conn.cursor()
-
-    cur.execute("SELECT id, task_name, time_to_make, resource_name, resource_amount FROM tasks WHERE worker_id=(?)", (idWorker,))
-    return cur.fetchall()
+# def getTasks(idWorker):
+#     cur = _conn.cursor()
+#
+#     cur.execute("SELECT id, task_name, time_to_make, resource_name, resource_amount FROM tasks WHERE worker_id=(?)", (idWorker,))
+#     return cur.fetchall()
 
 def useTaskResource(taskId):
     cur = _conn.cursor()
@@ -105,47 +120,40 @@ def copletedTask (taskId):
 
 
 
-while True:
-    workerList = getWorker()
-    for worker in workerList:
+while isExistTasks():
+    nextTaskList = getNextTask()
+    for task in nextTaskList:
+        taskId = task[0]
+        taskName = task[1]
+        workerId = task[2]
+        workerName = task[3].strip()
+        workerStatus = task[4]
 
-        workerId = worker[0]
-        workerName = worker[1].strip()
-        workerStatus = worker[2]
-
-        taskList = getTasks(workerId)
-
-        sumTaskForWorker = len(taskList)
-
-        if workerStatus == "idle" and sumTaskForWorker == 0:
-            continue
-
-        elif workerStatus == "idle" and sumTaskForWorker > 0:
-            print(str(workerName), " says: work work")
+        if workerStatus == "idle":
+            print(workerName, "says: work work")
             setWorkerStatus(workerId, "busy")
-
-        elif workerStatus == "busy" and sumTaskForWorker == 0:
-            print (workerName, "says: All Done!")
-            setWorkerStatus(workerId, "idle")
-            if not isExistTasks():
-                break
-
-
         else:
-            firstTask = taskList[0]
-            taskId = firstTask[0]
-            taskName = firstTask[1]
             if isReqireMakeTask(taskId):
-                print(workerName," is busy", taskName, "...")
+                print(workerName, " is busy ", taskName, "...", sep="")
                 makeTask(taskId)          # time_to_make-=1
                 useTaskResource(taskId)
             elif (not isReqireMakeTask(taskId)) and (isReqireResource(taskId)):
                 print (workerName,"doing a task")
                 useTaskResource(taskId)
 
-            if(not isReqireMakeTask(taskId)) and (not isReqireResource(taskId)):
-                copletedTask(taskId)
 
+    for task in nextTaskList:
+        taskId = task[0]
+        taskName = task[1]
+        workerId = task[2]
+        workerName = task[3].strip()
+        workerStatus = task[4]
 
+        if(not isReqireMakeTask(taskId)) and (not isReqireResource(taskId)):
+            copletedTask(taskId)
+            print (workerName, "says: All Done!")
+            setWorkerStatus(workerId, "idle")
+            if not isExistTasks():
+                break
 
 
